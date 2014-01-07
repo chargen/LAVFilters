@@ -97,11 +97,11 @@ configure() (
   EXTRA_LDFLAGS=""
   if [ "${arch}" == "x86_64" ]; then
     OPTIONS="${OPTIONS} --enable-cross-compile --cross-prefix=x86_64-w64-mingw32- --target-os=mingw32"
-    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L../thirdparty/lib64"
+    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L../thirdparty/lib64 -static-libgcc -static-libstdc++"
   else
     OPTIONS="${OPTIONS} --cpu=i686"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -mmmx -msse -mfpmath=sse"
-    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L../thirdparty/lib32"
+    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L../thirdparty/lib32 -static-libgcc -static-libstdc++"
   fi
 
   sh configure --extra-ldflags="${EXTRA_LDFLAGS}" --extra-cflags="${EXTRA_CFLAGS}" ${OPTIONS}
