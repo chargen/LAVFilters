@@ -10,3 +10,6 @@
 [submodule "thirdparty/dcadec"]
 	path = thirdparty/dcadec
 	url = https://github.com/foo86/dcadec.git
+[submodule "libde265"]
+	path = libde265
+	url = https://github.com/strukturag/libde265.git
