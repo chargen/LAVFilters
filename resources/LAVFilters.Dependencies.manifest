@@ -8,4 +8,5 @@
   <file name="avfilter-lav-5.dll" />
   <file name="swscale-lav-3.dll" />
   <file name="libbluray.dll" />
+  <file name="libde265.dll" />
 </assembly>
