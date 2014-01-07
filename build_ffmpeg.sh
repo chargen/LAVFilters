@@ -107,7 +107,7 @@ configure() (
   else
     OPTIONS="${OPTIONS} --cpu=i686"
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -mmmx -msse -mfpmath=sse"
-    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L../thirdparty/lib32"
+    EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L../thirdparty/lib32 -static-libgcc -static-libstdc++"
   fi
 
   sh configure --extra-ldflags="${EXTRA_LDFLAGS}" --extra-cflags="${EXTRA_CFLAGS}" ${OPTIONS}
