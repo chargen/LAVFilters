@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2010-2013 Hendrik Leppkes
+ *      Copyright (C) 2010-2014 Hendrik Leppkes
  *      http://www.1f0.de
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -56,7 +56,7 @@ static void str_replace(string &s, const string &search, const string &replace)
   }
 }
 
-static string GetCueParam(string line)
+static string GetCueParam(string line, bool firstWord = false)
 {
   const string delims(" \t\n\r\"'");
   string::size_type idx;
@@ -71,6 +71,10 @@ static string GetCueParam(string line)
   param = param.substr(0, param.find_last_not_of(delims) + 1);
   // replace escaped quotes
   str_replace(param, "\\\"", "\"");
+
+  if (firstWord) {
+    param = param.substr(0, param.find_first_of(delims));
+  }
   return param;
 }
 
@@ -116,24 +120,38 @@ HRESULT CCueSheet::Parse(string cueSheet)
       break;
     case ParserState::FILE:
     case ParserState::TRACK:
+      if (word == "FILE") {
+        DbgLog((LOG_TRACE, 10, L"CCueSheet::Parse(): Multiple FILE segments not supported."));
+        return E_FAIL;
+      }
       if (word == "TRACK") {
         state = ParserState::TRACK;
         trackCount++;
-        Track track{trackCount-1, "Title " + to_string(trackCount), 0};
+
+        string id = GetCueParam(line, true);
+        Track track{trackCount-1, id, "Title " + id, 0, ""};
         m_Tracks.push_back(track);
       } else if (state == ParserState::TRACK) {
         if (word == "TITLE") {
           m_Tracks.back().Title = GetCueParam(line);
         } else if (word == "INDEX") {
           m_Tracks.back().Time = ParseCueIndex(line);
+        } else if (word == "PERFORMER") {
+          m_Tracks.back().Performer = GetCueParam(line);
         }
-      } else if (word == "FILE") {
-        DbgLog((LOG_TRACE, 10, L"CCueSheet::Parse(): Multiple FILE segments not supported."));
-        return E_FAIL;
       }
       break;
     }
   }
 
   return S_OK;
+}
+
+std::string CCueSheet::FormatTrack(Track & track)
+{
+  string trackFormat = track.Id + ". ";
+  if (!track.Performer.empty())
+    trackFormat += track.Performer + " - ";
+  trackFormat += track.Title;
+  return trackFormat;
 }

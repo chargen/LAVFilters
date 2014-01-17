@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2010-2013 Hendrik Leppkes
+ *      Copyright (C) 2010-2014 Hendrik Leppkes
  *      http://www.1f0.de
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -688,8 +688,16 @@ DWORD CLAVSplitter::ThreadProc()
     m_rtStart = m_rtNewStart;
     m_rtStop = m_rtNewStop;
 
-    if(m_bPlaybackStarted || m_rtStart != 0 || cmd == CMD_SEEK)
-      DemuxSeek(m_rtStart);
+    if(m_bPlaybackStarted || m_rtStart != 0 || cmd == CMD_SEEK) {
+      HRESULT hr = S_FALSE;
+      if (m_pInput) {
+        hr = m_pInput->SeekStream(m_rtStart);
+        if (SUCCEEDED(hr))
+          m_pDemuxer->Reset();
+      }
+      if (hr != S_OK)
+        DemuxSeek(m_rtStart);
+    }
 
     if(cmd != (DWORD)-1)
       Reply(S_OK);
@@ -970,7 +978,27 @@ STDMETHODIMP CLAVSplitter::QueryPreferredFormat(GUID* pFormat) {return GetTimeFo
 STDMETHODIMP CLAVSplitter::GetTimeFormat(GUID* pFormat) {return pFormat ? *pFormat = TIME_FORMAT_MEDIA_TIME, S_OK : E_POINTER;}
 STDMETHODIMP CLAVSplitter::IsUsingTimeFormat(const GUID* pFormat) {return IsFormatSupported(pFormat);}
 STDMETHODIMP CLAVSplitter::SetTimeFormat(const GUID* pFormat) {return S_OK == IsFormatSupported(pFormat) ? S_OK : E_INVALIDARG;}
-STDMETHODIMP CLAVSplitter::GetDuration(LONGLONG* pDuration) {CheckPointer(pDuration, E_POINTER); CheckPointer(m_pDemuxer, E_UNEXPECTED); *pDuration = m_pDemuxer->GetDuration(); if (*pDuration < 0) return E_FAIL; return S_OK;}
+
+STDMETHODIMP CLAVSplitter::GetDuration(LONGLONG* pDuration) {
+  REFERENCE_TIME rtDuration = -1;
+  CheckPointer(pDuration, E_POINTER);
+  CheckPointer(m_pDemuxer, E_UNEXPECTED);
+
+  if (m_pInput) {
+    if (FAILED(m_pInput->GetStreamDuration(&rtDuration)))
+      rtDuration = -1;
+  }
+
+  if (rtDuration < 0)
+    rtDuration = m_pDemuxer->GetDuration();
+
+  if (rtDuration < 0)
+      return E_FAIL;
+
+  *pDuration = rtDuration;
+  return S_OK;
+}
+
 STDMETHODIMP CLAVSplitter::GetStopPosition(LONGLONG* pStop) {return GetDuration(pStop);}
 STDMETHODIMP CLAVSplitter::GetCurrentPosition(LONGLONG* pCurrent) {return E_NOTIMPL;}
 STDMETHODIMP CLAVSplitter::ConvertTimeFormat(LONGLONG* pTarget, const GUID* pTargetFormat, LONGLONG Source, const GUID* pSourceFormat) {return E_NOTIMPL;}
@@ -1310,7 +1338,7 @@ STDMETHODIMP CLAVSplitter::Info(long lIndex, AM_MEDIA_TYPE **ppmt, DWORD *pdwFla
       if(s.pid == NO_SUBTITLE_PID) {
         if (plcid) *plcid = LCID_NOSUBTITLES;
         if (ppszName) {
-          WCHAR str[] = L"S: No subtitles";
+          WCHAR str[] = L"S: " NO_SUB_STRING;
           size_t len = wcslen(str) + 1;
           *ppszName = (WCHAR*)CoTaskMemAlloc(len * sizeof(WCHAR));
           if (*ppszName)

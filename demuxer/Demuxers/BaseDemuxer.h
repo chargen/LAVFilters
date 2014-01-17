@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2010-2013 Hendrik Leppkes
+ *      Copyright (C) 2010-2014 Hendrik Leppkes
  *      http://www.1f0.de
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -28,6 +28,7 @@
 #define NO_SUBTITLE_PID DWORD_MAX
 #define FORCED_SUBTITLE_PID (NO_SUBTITLE_PID - 1)
 
+#define NO_SUB_STRING L"No subtitles"
 #define FORCED_SUB_STRING L"Forced Subtitles (auto)"
 
 struct ILAVFSettingsInternal;
@@ -78,6 +79,8 @@ public:
   virtual STDMETHODIMP GetNextPacket(Packet **ppPacket) = 0;
   // Seek to the given position
   virtual STDMETHODIMP Seek(REFERENCE_TIME rTime) = 0;
+  // Reset the demuxer, start reading at position 0
+  virtual STDMETHODIMP Reset() = 0;
   // Get the container format
   virtual const char *GetContainerFormat() const = 0;
   // Get Container Flags
@@ -120,7 +123,7 @@ public:
 
 protected:
   CBaseDemuxer(LPCTSTR pName, CCritSec *pLock);
-  void CreateNoSubtitleStream(CMediaType& mtype);
+  void CreateNoSubtitleStream();
   void CreatePGSForcedSubtitleStream();
 
 public:

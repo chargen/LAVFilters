@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2010-2013 Hendrik Leppkes
+ *      Copyright (C) 2010-2014 Hendrik Leppkes
  *      http://www.1f0.de
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -33,12 +33,16 @@ public:
 public:
   struct Track {
     int index;
+    std::string Id;
     std::string Title;
     REFERENCE_TIME Time;
+    std::string Performer;
   };
 
   std::string m_Performer;
   std::string m_Title;
   std::list<Track> m_Tracks;
+
+  std::string FormatTrack(Track & track);
 };
 
