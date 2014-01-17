@@ -10,3 +10,6 @@
 [submodule "libde265"]
 	path = libde265
 	url = https://github.com/strukturag/libde265.git
+[submodule "libde265-ffmpeg"]
+	path = libde265-ffmpeg
+	url = https://github.com/strukturag/libde265-ffmpeg.git
