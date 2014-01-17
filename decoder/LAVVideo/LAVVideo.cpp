@@ -39,6 +39,8 @@
 #include <evr.h>
 #include <d3d9.h>
 
+#include "libde265dec.h"
+
 class CLAVControlThread : public CAMThread
 {
 public:
@@ -58,6 +60,7 @@ void CALLBACK CLAVVideo::StaticInit(BOOL bLoading, const CLSID *clsid)
 
   avcodec_register_all();
   avfilter_register_all();
+  libde265dec_register();
 }
 
 #pragma warning(disable: 4355)

@@ -66,10 +66,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug' Or '$(Configuration)'=='DebugRelease'">
     <ClCompile>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;LAVVIDEO_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)qsdecoder</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)qsdecoder;$(SolutionDir)libde265-ffmpeg;$(SolutionDir)libde265</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>advapi32.lib;ole32.lib;gdi32.lib;winmm.lib;user32.lib;oleaut32.lib;shell32.lib;Shlwapi.lib;Comctl32.lib;d3d9.lib;dmoguids.lib;strmbasd.lib;dsutild.lib;avutil-lav.lib;avcodec-lav.lib;swscale-lav.lib;avfilter-lav.lib</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;ole32.lib;gdi32.lib;winmm.lib;user32.lib;oleaut32.lib;shell32.lib;Shlwapi.lib;Comctl32.lib;d3d9.lib;dmoguids.lib;strmbasd.lib;dsutild.lib;avutil-lav.lib;avcodec-lav.lib;swscale-lav.lib;avfilter-lav.lib;libde265.lib</AdditionalDependencies>
       <ModuleDefinitionFile>LAVVideo.def</ModuleDefinitionFile>
     </Link>
     <Manifest>
@@ -79,10 +79,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;LAVVIDEO_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)qsdecoder</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)qsdecoder;$(SolutionDir)libde265-ffmpeg;$(SolutionDir)libde265</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>advapi32.lib;ole32.lib;gdi32.lib;winmm.lib;user32.lib;oleaut32.lib;shell32.lib;Shlwapi.lib;Comctl32.lib;d3d9.lib;dmoguids.lib;strmbase.lib;dsutil.lib;avutil-lav.lib;avcodec-lav.lib;swscale-lav.lib;avfilter-lav.lib</AdditionalDependencies>
+      <AdditionalDependencies>advapi32.lib;ole32.lib;gdi32.lib;winmm.lib;user32.lib;oleaut32.lib;shell32.lib;Shlwapi.lib;Comctl32.lib;d3d9.lib;dmoguids.lib;strmbase.lib;dsutil.lib;avutil-lav.lib;avcodec-lav.lib;swscale-lav.lib;avfilter-lav.lib;libde265.lib</AdditionalDependencies>
       <ModuleDefinitionFile>LAVVideo.def</ModuleDefinitionFile>
     </Link>
     <CustomBuildStep>
@@ -107,6 +107,10 @@
     <ClCompile Include="Filtering.cpp" />
     <ClCompile Include="LAVPixFmtConverter.cpp" />
     <ClCompile Include="LAVVideo.cpp" />
+    <ClCompile Include="..\..\libde265-ffmpeg\libde265dec.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <CompileAs>CompileAsCpp</CompileAs>
+    </ClCompile>
     <ClCompile Include="Media.cpp" />
     <ClCompile Include="parsers\AVC1AnnexBConverter.cpp" />
     <ClCompile Include="parsers\H264SequenceParser.cpp" />
