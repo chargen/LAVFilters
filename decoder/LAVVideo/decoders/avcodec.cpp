@@ -465,6 +465,7 @@ STDMETHODIMP CDecAvcodec::InitDecoder(AVCodecID codec, const CMediaType *pmt)
                            || codec == AV_CODEC_ID_MPEG1VIDEO
                            || codec == AV_CODEC_ID_DIRAC
                            || codec == AV_CODEC_ID_VC1
+                           || codec == AV_CODEC_ID_HEVC
                           );
 
   // Stop time is unreliable, drop it and calculate it
