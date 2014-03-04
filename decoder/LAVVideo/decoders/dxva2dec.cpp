@@ -33,6 +33,8 @@
 
 #include "gpu_memcpy_sse4.h"
 
+#include <ppl.h>
+
 ////////////////////////////////////////////////////////////////////////////////
 // Constructor
 ////////////////////////////////////////////////////////////////////////////////
@@ -180,20 +182,42 @@ static int IsAMDUVD(DWORD dwDeviceId)
 // DXVA2 decoder implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-static void (*CopyFrameNV12)(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int srcLines, int dstLines, int pitch) = nullptr;
+static void (*CopyFrameNV12)(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int surfaceHeight, int imageHeight, int pitch) = nullptr;
 
-static void CopyFrameNV12_fallback(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int srcLines, int dstLines, int pitch)
+static void CopyFrameNV12_fallback(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int surfaceHeight, int imageHeight, int pitch)
 {
-  const int size = dstLines * pitch;
+  const int size = imageHeight * pitch;
   memcpy(pY, pSourceData, size);
-  memcpy(pUV, pSourceData + (srcLines * pitch), size >> 1);
+  memcpy(pUV, pSourceData + (surfaceHeight * pitch), size >> 1);
 }
 
-static void CopyFrameNV12_SSE4(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int srcLines, int dstLines, int pitch)
+static void CopyFrameNV12_fallback_MT(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int surfaceHeight, int imageHeight, int pitch)
 {
-  const int size = dstLines * pitch;
+  const int halfSize = (imageHeight * pitch) >> 1;
+  Concurrency::parallel_for(0, 3, [&](int i) {
+    if (i < 2)
+      memcpy(pY + (halfSize * i), pSourceData + (halfSize * i), halfSize);
+    else
+      memcpy(pUV, pSourceData + (surfaceHeight * pitch), halfSize);
+  });
+}
+
+static void CopyFrameNV12_SSE4(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int surfaceHeight, int imageHeight, int pitch)
+{
+  const int size = imageHeight * pitch;
   gpu_memcpy(pY, pSourceData, size);
-  gpu_memcpy(pUV, pSourceData + (srcLines * pitch), size >> 1);
+  gpu_memcpy(pUV, pSourceData + (surfaceHeight * pitch), size >> 1);
+}
+
+static void CopyFrameNV12_SSE4_MT(const BYTE *pSourceData, BYTE *pY, BYTE *pUV, int surfaceHeight, int imageHeight, int pitch)
+{
+  const int halfSize = (imageHeight * pitch) >> 1;
+  Concurrency::parallel_for(0, 3, [&](int i) {
+    if (i < 2)
+      gpu_memcpy(pY + (halfSize * i), pSourceData + (halfSize * i), halfSize);
+    else
+      gpu_memcpy(pUV, pSourceData + (surfaceHeight * pitch), halfSize);
+  });
 }
 
 CDecDXVA2::CDecDXVA2(void)
@@ -202,7 +226,9 @@ CDecDXVA2::CDecDXVA2(void)
   ZeroMemory(&dx, sizeof(dx));
   ZeroMemory(&m_DXVAExtendedFormat, sizeof(m_DXVAExtendedFormat));
   ZeroMemory(&m_pSurfaces, sizeof(m_pSurfaces));
+  ZeroMemory(&m_pRawSurface, sizeof(m_pRawSurface));
   ZeroMemory(&m_FrameQueue, sizeof(m_FrameQueue));
+  ZeroMemory(&m_DXVAVideoDecoderConfig, sizeof(m_DXVAVideoDecoderConfig));
 }
 
 CDecDXVA2::~CDecDXVA2(void)
@@ -307,6 +333,12 @@ STDMETHODIMP CDecDXVA2::PostConnect(IPin *pPin)
   }
 
   if (m_bNative) {
+    if (!m_pDecoder) {
+      // If this is the first call, re-align surfaces, as the requirements may only be known now
+      m_dwSurfaceWidth = GetAlignedDimension(m_pAVCtx->coded_width);
+      m_dwSurfaceHeight = GetAlignedDimension(m_pAVCtx->coded_height);
+    }
+
     CMediaType mt = m_pCallback->GetOutputMediaType();
     if (mt.subtype != MEDIASUBTYPE_NV12) {
       DbgLog((LOG_ERROR, 10, L"-> Connection is not NV12"));
@@ -663,12 +695,15 @@ HRESULT CDecDXVA2::CheckHWCompatConditions(GUID decoderGuid)
   int height_mbs = m_dwSurfaceHeight / 16;
   int max_ref_frames_dpb41 = min(11, 32768 / (width_mbs * height_mbs));
   if (m_dwVendorId == VEND_ID_ATI) {
-    if (m_dwSurfaceWidth > 1920 || m_dwSurfaceHeight > 1200) {
+    if ((width_mbs * height_mbs) > 16384) {
       DbgLog((LOG_TRACE, 10, L"-> UHD/4K resolutions blacklisted on AMD/ATI GPUs"));
       return E_FAIL;
     } else if (IsAMDUVD(m_dwDeviceId)) {
       if (m_pAVCtx->codec_id == AV_CODEC_ID_H264 && m_pAVCtx->refs > max_ref_frames_dpb41) {
         DbgLog((LOG_TRACE, 10, L"-> Too many reference frames for AMD UVD/UVD+ H.264 decoder"));
+        return E_FAIL;
+      } else if ((m_pAVCtx->codec_id == AV_CODEC_ID_VC1 || m_pAVCtx->codec_id == AV_CODEC_ID_MPEG2VIDEO) && (m_dwSurfaceWidth > 1920 || m_dwSurfaceHeight > 1200)) {
+        DbgLog((LOG_TRACE, 10, L"-> VC-1 Resolutions above FullHD are not supported by the UVD/UVD+ decoder"));
         return E_FAIL;
       } else if (m_pAVCtx->codec_id == AV_CODEC_ID_WMV3) {
         DbgLog((LOG_TRACE, 10, L"-> AMD UVD/UVD+ is currently not compatible with WMV3"));
@@ -782,10 +817,16 @@ STDMETHODIMP CDecDXVA2::Init()
       int cpu_flags = av_get_cpu_flags();
       if (cpu_flags & AV_CPU_FLAG_SSE4) {
         DbgLog((LOG_TRACE, 10, L"-> Using SSE4 frame copy"));
-        CopyFrameNV12 = CopyFrameNV12_SSE4;
+        if (m_dwVendorId == VEND_ID_INTEL)
+          CopyFrameNV12 = CopyFrameNV12_SSE4_MT;
+        else
+          CopyFrameNV12 = CopyFrameNV12_SSE4;
       } else {
         DbgLog((LOG_TRACE, 10, L"-> Using fallback frame copy"));
-        CopyFrameNV12 = CopyFrameNV12_fallback;
+        if (m_dwVendorId == VEND_ID_INTEL)
+          CopyFrameNV12 = CopyFrameNV12_fallback_MT;
+        else
+          CopyFrameNV12 = CopyFrameNV12_fallback;
       }
     }
   }
@@ -795,6 +836,17 @@ STDMETHODIMP CDecDXVA2::Init()
   CDecAvcodec::Init();
 
   return S_OK;
+}
+
+DWORD CDecDXVA2::GetAlignedDimension(DWORD dim)
+{
+  int align = DXVA2_SURFACE_BASE_ALIGN;
+
+  // MPEG-2 needs higher alignment on Intel cards, and it doesn't seem to harm anything to do it for all cards.
+  if (m_nCodecId == AV_CODEC_ID_MPEG2VIDEO)
+    align <<= 1;
+
+  return FFALIGN(dim, align);
 }
 
 #define H264_CHECK_PROFILE(profile) \
@@ -828,6 +880,10 @@ STDMETHODIMP CDecDXVA2::InitDecoder(AVCodecID codec, const CMediaType *pmt)
 
   m_DisplayDelay = DXVA2_QUEUE_SURFACES;
 
+  // Intel GPUs don't like the display and performance goes way down, so disable it.
+  if (m_dwVendorId == VEND_ID_INTEL)
+    m_DisplayDelay = 0;
+
   // Reduce display delay for DVD decoding for lower decode latency
   if (m_pCallback->GetDecodeFlags() & LAV_VIDEO_DEC_FLAG_DVD)
     m_DisplayDelay /= 2;
@@ -853,13 +909,14 @@ STDMETHODIMP CDecDXVA2::InitDecoder(AVCodecID codec, const CMediaType *pmt)
   }
 
   if (((codec == AV_CODEC_ID_H264 || codec == AV_CODEC_ID_MPEG2VIDEO) && m_pAVCtx->pix_fmt != AV_PIX_FMT_YUV420P && m_pAVCtx->pix_fmt != AV_PIX_FMT_YUVJ420P && m_pAVCtx->pix_fmt != AV_PIX_FMT_DXVA2_VLD && m_pAVCtx->pix_fmt != AV_PIX_FMT_NONE)
-    || (codec == AV_CODEC_ID_H264 && m_pAVCtx->profile != FF_PROFILE_UNKNOWN && !H264_CHECK_PROFILE(m_pAVCtx->profile))) {
+    || (codec == AV_CODEC_ID_H264 && m_pAVCtx->profile != FF_PROFILE_UNKNOWN && !H264_CHECK_PROFILE(m_pAVCtx->profile))
+    || ((codec == AV_CODEC_ID_WMV3 || codec == AV_CODEC_ID_VC1) && m_pAVCtx->profile == FF_PROFILE_VC1_COMPLEX)) {
     DbgLog((LOG_TRACE, 10, L"-> Incompatible profile detected, falling back to software decoding"));
     return E_FAIL;
   }
 
-  m_dwSurfaceWidth = FFALIGN(m_pAVCtx->coded_width, 16);
-  m_dwSurfaceHeight = FFALIGN(m_pAVCtx->coded_height, 16);
+  m_dwSurfaceWidth = GetAlignedDimension(m_pAVCtx->coded_width);
+  m_dwSurfaceHeight = GetAlignedDimension(m_pAVCtx->coded_height);
 
   if (FAILED(CheckHWCompatConditions(input))) {
     return E_FAIL;
@@ -941,8 +998,8 @@ HRESULT CDecDXVA2::CreateDXVA2Decoder(int nSurfaces, IDirect3DSurface9 **ppSurfa
   FindVideoServiceConversion(m_pAVCtx->codec_id, &input, &output);
 
   if (!nSurfaces) {
-    m_dwSurfaceWidth = FFALIGN(m_pAVCtx->coded_width, 16);
-    m_dwSurfaceHeight = FFALIGN(m_pAVCtx->coded_height, 16);
+    m_dwSurfaceWidth = GetAlignedDimension(m_pAVCtx->coded_width);
+    m_dwSurfaceHeight = GetAlignedDimension(m_pAVCtx->coded_height);
 
     m_NumSurfaces = GetBufferCount();
     hr = m_pDXVADecoderService->CreateSurface(m_dwSurfaceWidth, m_dwSurfaceHeight, m_NumSurfaces - 1, output, D3DPOOL_DEFAULT, 0, DXVA2_VideoDecoderRenderTarget, pSurfaces, nullptr);
@@ -959,12 +1016,27 @@ HRESULT CDecDXVA2::CreateDXVA2Decoder(int nSurfaces, IDirect3DSurface9 **ppSurfa
     }
   }
 
+  if (m_NumSurfaces <= 0) {
+    DbgLog((LOG_TRACE, 10, L"-> No surfaces? No good!"));
+    return E_FAIL;
+  }
+
+  // get the device, for ColorFill() to init the surfaces in black
+  IDirect3DDevice9 *pDev = nullptr;
+  ppSurfaces[0]->GetDevice(&pDev);
+
   for (int i = 0; i < m_NumSurfaces; i++) {
     m_pSurfaces[i].index = i;
     m_pSurfaces[i].d3d = ppSurfaces[i];
     m_pSurfaces[i].age = 0;
     m_pSurfaces[i].used = false;
+
+    // fill the surface in black, to avoid the "green screen" in case the first frame fails to decode.
+    if (pDev) pDev->ColorFill(ppSurfaces[i], NULL, D3DCOLOR_XYUV(0, 128, 128));
   }
+
+  // and done with the device
+  SafeRelease(&pDev);
 
   DbgLog((LOG_TRACE, 10, L"-> Successfully created %d surfaces (%dx%d)", m_NumSurfaces, m_dwSurfaceWidth, m_dwSurfaceHeight));
 
@@ -1060,7 +1132,7 @@ int CDecDXVA2::get_dxva2_buffer(struct AVCodecContext *c, AVFrame *pic, int flag
     return -1;
   }
 
-  if (!pDec->m_pDecoder || FFALIGN(c->coded_width, 16) != pDec->m_dwSurfaceWidth || FFALIGN(c->coded_height, 16) != pDec->m_dwSurfaceHeight) {
+  if (!pDec->m_pDecoder || pDec->GetAlignedDimension(c->coded_width) != pDec->m_dwSurfaceWidth || pDec->GetAlignedDimension(c->coded_height) != pDec->m_dwSurfaceHeight) {
     DbgLog((LOG_TRACE, 10, L"No DXVA2 Decoder or image dimensions changed -> Re-Allocating resources"));
     if (!pDec->m_pDecoder && pDec->m_bNative && !pDec->m_pDXVA2Allocator) {
       ASSERT(0);
@@ -1068,8 +1140,8 @@ int CDecDXVA2::get_dxva2_buffer(struct AVCodecContext *c, AVFrame *pic, int flag
     } else if (pDec->m_bNative) {
       avcodec_flush_buffers(c);
 
-      pDec->m_dwSurfaceWidth = FFALIGN(c->coded_width, 16);
-      pDec->m_dwSurfaceHeight = FFALIGN(c->coded_height, 16);
+      pDec->m_dwSurfaceWidth = pDec->GetAlignedDimension(c->coded_width);
+      pDec->m_dwSurfaceHeight = pDec->GetAlignedDimension(c->coded_height);
 
       // Re-Commit the allocator (creates surfaces and new decoder)
       hr = pDec->m_pDXVA2Allocator->Decommit();
@@ -1279,7 +1351,7 @@ HRESULT CDecDXVA2::HandleDXVA2Frame(LAVFrame *pFrame)
     Deliver(pFrame);
     return S_OK;
   }
-  if (m_bNative) {
+  if (m_bNative || m_DisplayDelay == 0) {
     DeliverDXVA2Frame(pFrame);
   } else {
     LAVFrame *pQueuedFrame = m_FrameQueue[m_FrameQueuePosition];

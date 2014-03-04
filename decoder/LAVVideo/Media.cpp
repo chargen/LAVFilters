@@ -255,6 +255,8 @@ static const FFMPEG_SUBTYPE_MAP lavc_video_codecs[] = {
   //{ &MEDIASUBTYPE_G2M3, AV_CODEC_ID_G2M },
   { &MEDIASUBTYPE_G2M4, AV_CODEC_ID_G2M },
   { &MEDIASUBTYPE_icod, AV_CODEC_ID_AIC },
+  { &MEDIASUBTYPE_DUCK, AV_CODEC_ID_TRUEMOTION1 },
+  { &MEDIASUBTYPE_TM20, AV_CODEC_ID_TRUEMOTION2 },
 
   // Game Formats
   { &MEDIASUBTYPE_BIKI, AV_CODEC_ID_BINKVIDEO  },
@@ -505,6 +507,8 @@ const AMOVIESETUP_MEDIATYPE CLAVVideo::sudPinTypesIn[] = {
   //{ &MEDIATYPE_Video, &MEDIASUBTYPE_G2M3 },
   { &MEDIATYPE_Video, &MEDIASUBTYPE_G2M4 },
   { &MEDIATYPE_Video, &MEDIASUBTYPE_icod },
+  { &MEDIATYPE_Video, &MEDIASUBTYPE_DUCK },
+  { &MEDIATYPE_Video, &MEDIASUBTYPE_TM20 },
 
   // Game Formats
   { &MEDIATYPE_Video, &MEDIASUBTYPE_BIKI },
@@ -608,6 +612,7 @@ static codec_config_t m_codec_config[] = {
   { 1, { AV_CODEC_ID_THP }},                                                 // Codec_THP
   { 1, { AV_CODEC_ID_HEVC }},                                                // Codec_HEVC
   { 1, { AV_CODEC_ID_VP9 }},                                                 // Codec_VP9
+  { 2, { AV_CODEC_ID_TRUEMOTION1, AV_CODEC_ID_TRUEMOTION2 }, "truemotion", "Duck TrueMotion 1/2"}, // Codec_TrueMotion
 };
 
 const codec_config_t *get_codec_config(LAVVideoCodec codec)
@@ -669,6 +674,9 @@ void fillDXVAExtFormat(DXVA2_ExtendedFormat &fmt, int range, int primaries, int 
   case AVCOL_PRI_SMPTE240M:
     fmt.VideoPrimaries = DXVA2_VideoPrimaries_SMPTE240M;
     break;
+  case AVCOL_PRI_BT2020:
+    fmt.VideoPrimaries = (DXVA2_VideoPrimaries)9;
+    break;
   }
 
   // Color Space / Transfer Matrix
@@ -676,15 +684,20 @@ void fillDXVAExtFormat(DXVA2_ExtendedFormat &fmt, int range, int primaries, int 
   case AVCOL_SPC_BT709:
     fmt.VideoTransferMatrix = DXVA2_VideoTransferMatrix_BT709;
     break;
-  case AVCOL_SPC_FCC:
-    fmt.VideoTransferMatrix = (DXVA2_VideoTransferMatrix)6;
-    break;
   case AVCOL_SPC_BT470BG:
   case AVCOL_SPC_SMPTE170M:
     fmt.VideoTransferMatrix = DXVA2_VideoTransferMatrix_BT601;
     break;
   case AVCOL_SPC_SMPTE240M:
     fmt.VideoTransferMatrix = DXVA2_VideoTransferMatrix_SMPTE240M;
+    break;
+  // Custom values, not official standard, but understood by madVR
+  case AVCOL_SPC_BT2020_CL:
+  case AVCOL_SPC_BT2020_NCL:
+    fmt.VideoTransferMatrix = (DXVA2_VideoTransferMatrix)4;
+    break;
+  case AVCOL_SPC_FCC:
+    fmt.VideoTransferMatrix = (DXVA2_VideoTransferMatrix)6;
     break;
   case AVCOL_SPC_YCGCO:
     fmt.VideoTransferMatrix = (DXVA2_VideoTransferMatrix)7;

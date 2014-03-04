@@ -42,7 +42,6 @@ configure() (
   OPTIONS="
     --enable-shared                 \
     --disable-static                \
-    --enable-gpl                    \
     --enable-version3               \
     --enable-w32threads             \
     --disable-demuxer=matroska      \
@@ -64,6 +63,7 @@ configure() (
     --enable-hwaccel=wmv3_dxva2     \
     --enable-hwaccel=mpeg2_dxva2    \
     --enable-avresample             \
+    --enable-avisynth               \
     --disable-avdevice              \
     --disable-postproc              \
     --disable-swresample            \

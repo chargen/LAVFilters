@@ -345,7 +345,7 @@ STDMETHODIMP CDecAvcodec::InitDecoder(AVCodecID codec, const CMediaType *pmt)
   m_pAVCtx->coded_height          = abs(pBMI->biHeight);
   m_pAVCtx->bits_per_coded_sample = pBMI->biBitCount;
   m_pAVCtx->error_concealment     = FF_EC_GUESS_MVS | FF_EC_DEBLOCK;
-  m_pAVCtx->err_recognition       = AV_EF_CAREFUL;
+  m_pAVCtx->err_recognition       = 0;
   m_pAVCtx->workaround_bugs       = FF_BUG_AUTODETECT;
   m_pAVCtx->refcounted_frames     = 1;
 
@@ -452,9 +452,13 @@ STDMETHODIMP CDecAvcodec::InitDecoder(AVCodecID codec, const CMediaType *pmt)
   m_bInputPadded = dwDecFlags & LAV_VIDEO_DEC_FLAG_LAVSPLITTER;
 
   // Setup codec-specific timing logic
-  BOOL bVC1IsPTS = (codec == AV_CODEC_ID_VC1 && !(dwDecFlags & LAV_VIDEO_DEC_FLAG_ONLY_DTS));
 
+  // MPEG-4 with VideoInfo/2 is from AVI, and only DTS
   if (codec == AV_CODEC_ID_MPEG4 && pmt->formattype != FORMAT_MPEG2Video)
+    dwDecFlags |= LAV_VIDEO_DEC_FLAG_ONLY_DTS;
+
+  // RealVideo is only DTS
+  if (codec == AV_CODEC_ID_RV10 || codec == AV_CODEC_ID_RV20 || codec == AV_CODEC_ID_RV30 || codec == AV_CODEC_ID_RV40)
     dwDecFlags |= LAV_VIDEO_DEC_FLAG_ONLY_DTS;
 
   // Use ffmpegs logic to reorder timestamps
@@ -469,7 +473,7 @@ STDMETHODIMP CDecAvcodec::InitDecoder(AVCodecID codec, const CMediaType *pmt)
                           );
 
   // Stop time is unreliable, drop it and calculate it
-  m_bCalculateStopTime   = (codec == AV_CODEC_ID_H264 || codec == AV_CODEC_ID_DIRAC || (codec == AV_CODEC_ID_MPEG4 && pmt->formattype == FORMAT_MPEG2Video) || bVC1IsPTS);
+  m_bCalculateStopTime   = (codec == AV_CODEC_ID_H264 || codec == AV_CODEC_ID_DIRAC || (codec == AV_CODEC_ID_MPEG4 && pmt->formattype == FORMAT_MPEG2Video) || (codec == AV_CODEC_ID_VC1 && !(dwDecFlags & LAV_VIDEO_DEC_FLAG_ONLY_DTS)));
 
   // Real Video content has some odd timestamps
   // LAV Splitter does them allright with RV30/RV40, everything else screws them up
@@ -873,14 +877,16 @@ STDMETHODIMP CDecAvcodec::Decode(const BYTE *buffer, int buflen, REFERENCE_TIME 
     if (map.conversion) {
       ConvertPixFmt(m_pFrame, pOutFrame);
     } else {
+      AVFrame *pFrameRef = av_frame_alloc();
+      av_frame_ref(pFrameRef, m_pFrame);
+
       for (int i = 0; i < 4; i++) {
-        pOutFrame->data[i]   = m_pFrame->data[i];
-        pOutFrame->stride[i] = m_pFrame->linesize[i];
+        pOutFrame->data[i]   = pFrameRef->data[i];
+        pOutFrame->stride[i] = pFrameRef->linesize[i];
       }
 
-      pOutFrame->priv_data = av_frame_alloc();
-      av_frame_ref((AVFrame *)pOutFrame->priv_data, m_pFrame);
-      pOutFrame->destruct  = lav_avframe_free;
+      pOutFrame->priv_data = pFrameRef;
+      pOutFrame->destruct = lav_avframe_free;
 
       // Check alignment on rawvideo, which can be off depending on the source file
       if (m_nCodecId == AV_CODEC_ID_RAWVIDEO) {

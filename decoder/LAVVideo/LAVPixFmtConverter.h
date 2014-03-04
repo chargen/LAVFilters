@@ -22,7 +22,7 @@
 #include "LAVVideoSettings.h"
 #include "decoders/ILAVDecoder.h"
 
-#define CONV_FUNC_PARAMS (const uint8_t* const src[4], const int srcStride[4], uint8_t* dst[4], int dstStride[4], int width, int height, LAVPixelFormat inputFormat, int bpp, LAVOutPixFmts outputFormat)
+#define CONV_FUNC_PARAMS (const uint8_t* const src[4], const int srcStride[4], uint8_t* dst[4], const int dstStride[4], int width, int height, LAVPixelFormat inputFormat, int bpp, LAVOutPixFmts outputFormat)
 
 #define DECLARE_CONV_FUNC(name) \
   HRESULT name CONV_FUNC_PARAMS
@@ -49,6 +49,8 @@ typedef struct _RGBCoeffs {
   __m128i cG_Cb_cG_Cr;
   __m128i cB_Cb;
 } RGBCoeffs;
+
+typedef int (__stdcall *YUVRGBConversionFunc)(const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV, uint8_t *dst, int width, int height, ptrdiff_t srcStrideY, ptrdiff_t srcStrideUV, ptrdiff_t dstStride, ptrdiff_t sliceYStart, ptrdiff_t sliceYEnd, const RGBCoeffs *coeffs, const uint16_t *dithers);
 
 extern LAVOutPixFmtDesc lav_pixfmt_desc[];
 
@@ -90,14 +92,14 @@ private:
   void SelectConvertFunction();
 
   // Helper functions for convert_generic
-  HRESULT swscale_scale(enum AVPixelFormat srcPix, enum AVPixelFormat dstPix, const uint8_t* const src[], const int srcStride[], uint8_t* dst[], int width, int height, int dstStride[], LAVOutPixFmtDesc pixFmtDesc, bool swapPlanes12 = false);
-  HRESULT ConvertTo422Packed(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, int dstStride[4]);
-  HRESULT ConvertToAYUV(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, int dstStride[4]);
-  HRESULT ConvertToPX1X(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, int dstStride[4], int chromaVertical);
-  HRESULT ConvertToY410(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, int dstStride[4]);
-  HRESULT ConvertToY416(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, int dstStride[4]);
-  HRESULT ConvertTov210(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, int dstStride[4]);
-  HRESULT ConvertTov410(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, int dstStride[4]);
+  HRESULT swscale_scale(enum AVPixelFormat srcPix, enum AVPixelFormat dstPix, const uint8_t* const src[], const int srcStride[], uint8_t* dst[], int width, int height, const int dstStride[], LAVOutPixFmtDesc pixFmtDesc, bool swapPlanes12 = false);
+  HRESULT ConvertTo422Packed(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, const int dstStride[4]);
+  HRESULT ConvertToAYUV(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, const int dstStride[4]);
+  HRESULT ConvertToPX1X(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, const int dstStride[4], int chromaVertical);
+  HRESULT ConvertToY410(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, const int dstStride[4]);
+  HRESULT ConvertToY416(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, const int dstStride[4]);
+  HRESULT ConvertTov210(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, const int dstStride[4]);
+  HRESULT ConvertTov410(const uint8_t* const src[4], const int srcStride[4], uint8_t *dst[4], int width, int height, const int dstStride[4]);
 
   void DestroySWScale() { if (m_pSwsContext) sws_freeContext(m_pSwsContext); m_pSwsContext = nullptr; if (m_rgbCoeffs) _aligned_free(m_rgbCoeffs); m_rgbCoeffs = nullptr; if (m_pRandomDithers) _aligned_free(m_pRandomDithers); m_pRandomDithers = nullptr; };
   SwsContext *GetSWSContext(int width, int height, enum AVPixelFormat srcPix, enum AVPixelFormat dstPix, int flags);
@@ -119,7 +121,6 @@ private:
   DECLARE_CONV_FUNC(convert_yuv420_nv12);
   DECLARE_CONV_FUNC(convert_yuv_yv);
   DECLARE_CONV_FUNC(convert_nv12_yv12);
-  DECLARE_CONV_FUNC(convert_nv12_nv12);
   template <int uyvy> DECLARE_CONV_FUNC(convert_yuv420_yuy2);
   template <int uyvy> DECLARE_CONV_FUNC(convert_yuv422_yuy2_uyvy);
   template <int uyvy> DECLARE_CONV_FUNC(convert_yuv422_yuy2_uyvy_dither_le);
@@ -128,8 +129,10 @@ private:
   DECLARE_CONV_FUNC(convert_rgb48_rgb32_ssse3);
   template <int out32> DECLARE_CONV_FUNC(convert_rgb48_rgb);
 
-  template <int out32> DECLARE_CONV_FUNC(convert_yuv_rgb);
-  RGBCoeffs* getRGBCoeffs(int width, int height);
+  DECLARE_CONV_FUNC(convert_yuv_rgb);
+  const RGBCoeffs* getRGBCoeffs(int width, int height);
+  void InitRGBConvDispatcher();
+
   const uint16_t* GetRandomDitherCoeffs(int height, int coeffs, int bits, int line);
 
 private:
@@ -156,6 +159,10 @@ private:
 
   RGBCoeffs *m_rgbCoeffs = nullptr;
   BOOL m_bRGBConverter   = FALSE;
+  BOOL m_bRGBConvInit    = FALSE;
+
+  // [out32][dithermode][ycgco][format][shift]
+  YUVRGBConversionFunc m_RGBConvFuncs[2][2][2][LAVPixFmt_NB][9];
 
   uint16_t *m_pRandomDithers = nullptr;
   int m_ditherWidth  = 0;

@@ -21,6 +21,8 @@
 
 #include <Qnetwork.h>
 #include <set>
+#include <algorithm>
+#include <sstream>
 
 #include "BaseDemuxer.h"
 #include "IKeyFrameInfo.h"
@@ -162,6 +164,7 @@ private:
 
   STDMETHODIMP GetBSTRMetadata(const char *key, BSTR *pbstrValue, int stream = -1);
   STDMETHODIMP CreatePacketMediaType(Packet *pPacket, enum AVCodecID codec_id, BYTE *extradata, int extradata_size, BYTE *paramchange, int paramchange_size);
+  STDMETHODIMP ParseICYMetadataPacket();
 
 private:
   AVFormatContext *m_avFormat        = nullptr;
@@ -192,7 +195,7 @@ private:
   CFontInstaller *m_pFontInstaller   = nullptr;
   ILAVFSettingsInternal *m_pSettings = nullptr;
 
-  BOOL m_bEnableTrackInfo            = FALSE;
+  BOOL m_bEnableTrackInfo            = TRUE;
 
   CBDDemuxer *m_pBluRay              = nullptr;
 

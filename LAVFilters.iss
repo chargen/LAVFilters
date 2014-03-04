@@ -55,7 +55,7 @@ Name: associate_wmp;  Description: "Associate file extensions with Windows Media
 
 [Files]
 Source: bin_Win32\avcodec-lav-55.dll;  DestDir: {app}\x86; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavsplitter32 lavaudio32 lavvideo32
-Source: bin_Win32\avfilter-lav-3.dll;  DestDir: {app}\x86; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavvideo32
+Source: bin_Win32\avfilter-lav-4.dll;  DestDir: {app}\x86; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavvideo32
 Source: bin_Win32\avformat-lav-55.dll; DestDir: {app}\x86; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavsplitter32 lavaudio32
 Source: bin_Win32\avresample-lav-1.dll;DestDir: {app}\x86; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavaudio32
 Source: bin_Win32\avutil-lav-52.dll;   DestDir: {app}\x86; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavsplitter32 lavaudio32 lavvideo32
@@ -69,7 +69,7 @@ Source: bin_Win32\IntelQuickSyncDecoder.dll; DestDir: {app}\x86; Flags: ignoreve
 Source: bin_Win32\libde265.dll;        DestDir: {app}\x86; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavvideo32
 
 Source: bin_x64\avcodec-lav-55.dll;    DestDir: {app}\x64; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavsplitter64 lavaudio64 lavvideo64
-Source: bin_x64\avfilter-lav-3.dll;    DestDir: {app}\x64; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavvideo64
+Source: bin_x64\avfilter-lav-4.dll;    DestDir: {app}\x64; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavvideo64
 Source: bin_x64\avformat-lav-55.dll;   DestDir: {app}\x64; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavsplitter64 lavaudio64
 Source: bin_x64\avresample-lav-1.dll;  DestDir: {app}\x64; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavaudio64
 Source: bin_x64\avutil-lav-52.dll;     DestDir: {app}\x64; Flags: ignoreversion restartreplace uninsrestartdelete; Components: lavsplitter64 lavaudio64 lavvideo64
@@ -202,15 +202,17 @@ begin
   FR(SplitterFormats[11], 'mxf', 'MXF (Material Exchange Format)', False, ['mxf', '']);
   FR(SplitterFormats[12], 'bink', 'Bink', False, ['bik', '']);
 
-  FP(SplitterFormats[13], 'rtsp', 'RTSP Streaming Protocol', False, ['rtsp', '']);
-  FP(SplitterFormats[14], 'rtp', 'RTP Streaming Protocol', False, ['rtp', '']);
-  FP(SplitterFormats[15], 'mms', 'MMS Streaming Protocol', False, ['mms', 'mmsh', 'mmst', '']);
+  FR(SplitterFormats[13], 'avisynth', 'AviSynth scripts', False, ['avs', '']);
 
-  FR(SplitterFormats[16], 'dts', 'DTS Audio', False, ['dts', 'dtshd', '']);
-  FR(SplitterFormats[17], 'ac3', 'AC3 Audio', False, ['ac3', 'eac3', '']);
-  FR(SplitterFormats[18], 'aac', 'AAC Audio', False, ['aac', '']);
-  FR(SplitterFormats[19], 'mp3', 'MP3 Audio', False, ['mp3', '']);
-  FR(SplitterFormats[20], 'flac', 'FLAC Audio', False, ['flac', '']);
+  FP(SplitterFormats[14], 'rtsp', 'RTSP Streaming Protocol', False, ['rtsp', '']);
+  FP(SplitterFormats[15], 'rtp', 'RTP Streaming Protocol', False, ['rtp', '']);
+  FP(SplitterFormats[16], 'mms', 'MMS Streaming Protocol', False, ['mms', 'mmsh', 'mmst', '']);
+
+  FR(SplitterFormats[17], 'dts', 'DTS Audio', False, ['dts', 'dtshd', '']);
+  FR(SplitterFormats[18], 'ac3', 'AC3 Audio', False, ['ac3', 'eac3', '']);
+  FR(SplitterFormats[19], 'aac', 'AAC Audio', False, ['aac', '']);
+  FR(SplitterFormats[20], 'mp3', 'MP3 Audio', False, ['mp3', '']);
+  FR(SplitterFormats[21], 'flac', 'FLAC Audio', False, ['flac', '']);
 end;
 
 procedure RegisterSourceFormatGUIDs(f: Format);

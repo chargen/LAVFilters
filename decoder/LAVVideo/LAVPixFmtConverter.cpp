@@ -223,7 +223,7 @@ void CLAVPixFmtConverter::GetMediaType(CMediaType *mt, int index, LONG biWidth, 
     memset(vih, 0, sizeof(VIDEOINFOHEADER));
 
     vih->rcSource.right = vih->rcTarget.right = biWidth;
-    vih->rcSource.bottom = vih->rcTarget.bottom = biHeight;
+    vih->rcSource.bottom = vih->rcTarget.bottom = abs(biHeight);
     vih->AvgTimePerFrame = rtAvgTime;
 
     pBIH = &vih->bmiHeader;
@@ -236,7 +236,7 @@ void CLAVPixFmtConverter::GetMediaType(CMediaType *mt, int index, LONG biWidth, 
     // Validate the Aspect Ratio - an AR of 0 crashes VMR-9
     if (dwAspectX == 0 || dwAspectY == 0) {
       dwAspectX = biWidth;
-      dwAspectY = biHeight;
+      dwAspectY = abs(biHeight);
     }
 
     // Always reduce the AR to the smalles fraction
@@ -244,7 +244,7 @@ void CLAVPixFmtConverter::GetMediaType(CMediaType *mt, int index, LONG biWidth, 
     av_reduce(&dwX, &dwY, dwAspectX, dwAspectY, max(dwAspectX, dwAspectY));
 
     vih2->rcSource.right = vih2->rcTarget.right = biWidth;
-    vih2->rcSource.bottom = vih2->rcTarget.bottom = biHeight;
+    vih2->rcSource.bottom = vih2->rcTarget.bottom = abs(biHeight);
     vih2->AvgTimePerFrame = rtAvgTime;
     vih2->dwPictAspectRatioX = dwX;
     vih2->dwPictAspectRatioY = dwY;
@@ -321,7 +321,8 @@ void CLAVPixFmtConverter::SelectConvertFunction()
     // We assume that every filter that understands v210 will also properly handle it
     m_RequiredAlignment = 0;
   } else if ((m_OutputPixFmt == LAVOutPixFmt_RGB32 && (m_InputPixFmt == LAVPixFmt_RGB32 || m_InputPixFmt == LAVPixFmt_ARGB32))
-    || (m_OutputPixFmt == LAVOutPixFmt_RGB24 && m_InputPixFmt == LAVPixFmt_RGB24) || (m_OutputPixFmt == LAVOutPixFmt_RGB48 && m_InputPixFmt == LAVPixFmt_RGB48)) {
+    || (m_OutputPixFmt == LAVOutPixFmt_RGB24 && m_InputPixFmt == LAVPixFmt_RGB24) || (m_OutputPixFmt == LAVOutPixFmt_RGB48 && m_InputPixFmt == LAVPixFmt_RGB48)
+    || (m_OutputPixFmt == LAVOutPixFmt_NV12 && m_InputPixFmt == LAVPixFmt_NV12)) {
     convert = &CLAVPixFmtConverter::plane_copy;
     m_RequiredAlignment = 0;
   } else if (m_InputPixFmt == LAVPixFmt_RGB48 && m_OutputPixFmt == LAVOutPixFmt_RGB32 && (cpu & AV_CPU_FLAG_SSSE3)) {
@@ -359,11 +360,9 @@ void CLAVPixFmtConverter::SelectConvertFunction()
              || m_InputPixFmt == LAVPixFmt_YUV422 || m_InputPixFmt == LAVPixFmt_YUV422bX
              || m_InputPixFmt == LAVPixFmt_YUV444 || m_InputPixFmt == LAVPixFmt_YUV444bX
              || m_InputPixFmt == LAVPixFmt_NV12)) {
+      convert = &CLAVPixFmtConverter::convert_yuv_rgb;
       if (m_OutputPixFmt == LAVOutPixFmt_RGB32) {
-        convert = &CLAVPixFmtConverter::convert_yuv_rgb<1>;
         m_RequiredAlignment = 4;
-      } else {
-        convert = &CLAVPixFmtConverter::convert_yuv_rgb<0>;
       }
       m_bRGBConverter = TRUE;
     } else if (m_OutputPixFmt == LAVOutPixFmt_YV12 && m_InputPixFmt == LAVPixFmt_NV12) {
@@ -384,9 +383,6 @@ void CLAVPixFmtConverter::SelectConvertFunction()
       }
 
       m_RequiredAlignment = 8; // Pixel alignment of 8 guarantees a byte alignment of 16
-    } else if ((m_OutputPixFmt == LAVOutPixFmt_NV12 && m_InputPixFmt == LAVPixFmt_NV12)) {
-      convert = &CLAVPixFmtConverter::convert_nv12_nv12;
-      m_RequiredAlignment = 0;
     } else if ((m_OutputPixFmt == LAVOutPixFmt_YV12 && m_InputPixFmt == LAVPixFmt_YUV420)
             || (m_OutputPixFmt == LAVOutPixFmt_YV16 && m_InputPixFmt == LAVPixFmt_YUV422)
             || (m_OutputPixFmt == LAVOutPixFmt_YV24 && m_InputPixFmt == LAVPixFmt_YUV444)) {
@@ -398,10 +394,6 @@ void CLAVPixFmtConverter::SelectConvertFunction()
       else
         convert = &CLAVPixFmtConverter::convert_rgb48_rgb<0>;
     }
-  // Fallbacks only to be used when SSE2 is not available
-  } else if ((m_OutputPixFmt == LAVOutPixFmt_NV12 && m_InputPixFmt == LAVPixFmt_NV12)) {
-    convert = &CLAVPixFmtConverter::plane_copy;
-    m_RequiredAlignment = 0;
   }
 
   if (convert == nullptr) {
@@ -416,12 +408,15 @@ HRESULT CLAVPixFmtConverter::Convert(LAVFrame *pFrame, uint8_t *dst, int width, 
   // Check if we have proper pixel alignment and the dst memory is actually aligned
   if (m_RequiredAlignment && (FFALIGN(dstStride, m_RequiredAlignment) != dstStride || ((uintptr_t)dst % 16u))) {
     outStride = FFALIGN(dstStride, m_RequiredAlignment);
-    size_t requiredSize = (outStride * planeHeight * lav_pixfmt_desc[m_OutputPixFmt].bpp) << 3;
-    if (requiredSize > m_nAlignedBufferSize) {
+    size_t requiredSize = (outStride * planeHeight * lav_pixfmt_desc[m_OutputPixFmt].bpp) >> 3;
+    if (requiredSize > m_nAlignedBufferSize || !m_pAlignedBuffer) {
       DbgLog((LOG_TRACE, 10, L"::Convert(): Conversion requires a bigger stride (need: %d, have: %d), allocating buffer...", outStride, dstStride));
       av_freep(&m_pAlignedBuffer);
+      m_pAlignedBuffer = (uint8_t *)av_malloc(requiredSize+FF_INPUT_BUFFER_PADDING_SIZE);
+      if (!m_pAlignedBuffer) {
+        return E_FAIL;
+      }
       m_nAlignedBufferSize = requiredSize;
-      m_pAlignedBuffer = (uint8_t *)av_malloc(m_nAlignedBufferSize+FF_INPUT_BUFFER_PADDING_SIZE);
     }
     out = m_pAlignedBuffer;
   }

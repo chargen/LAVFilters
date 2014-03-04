@@ -55,7 +55,6 @@ configure() (
   OPTIONS="
     --enable-shared                 \
     --disable-static                \
-    --enable-gpl                    \
     --enable-version3               \
     --enable-pthreads               \
     --disable-demuxer=matroska      \
@@ -81,6 +80,7 @@ configure() (
     --enable-libopencore-amrwb      \
     --enable-libopus                \
     --enable-avresample             \
+    --enable-avisynth               \
     --disable-avdevice              \
     --disable-postproc              \
     --disable-swresample            \
