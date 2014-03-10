@@ -3,14 +3,15 @@
 ; Include version info
 #define ISPP_INCLUDED
 #include "common\includes\version.h"
+#include "common\includes\libde265-version.h"
 
-#if LAV_VERSION_BUILD > 0
-    #define LAV_VERSION_STRING str(LAV_VERSION_MAJOR) + "." + str(LAV_VERSION_MINOR) + "." + str(LAV_VERSION_REVISION) + "-" + str(LAV_VERSION_BUILD)
+#if LIBDE265_VERSION_BUILD > 0
+    #define LIBDE265_VERSION_STRING str(LIBDE265_VERSION_MAJOR) + "." + str(LIBDE265_VERSION_MINOR) + "." + str(LIBDE265_VERSION_REVISION) + "-" + str(LIBDE265_VERSION_BUILD)
 #else
-    #if LAV_VERSION_REVISION > 0
-        #define LAV_VERSION_STRING str(LAV_VERSION_MAJOR) + "." + str(LAV_VERSION_MINOR) + "." + str(LAV_VERSION_REVISION)
+    #if LIBDE265_VERSION_REVISION > 0
+        #define LIBDE265_VERSION_STRING str(LIBDE265_VERSION_MAJOR) + "." + str(LIBDE265_VERSION_MINOR) + "." + str(LIBDE265_VERSION_REVISION)
     #else
-        #define LAV_VERSION_STRING str(LAV_VERSION_MAJOR) + "." + str(LAV_VERSION_MINOR)
+        #define LIBDE265_VERSION_STRING str(LIBDE265_VERSION_MAJOR) + "." + str(LIBDE265_VERSION_MINOR)
     #endif
 #endif
 
@@ -22,12 +23,12 @@ AppId                     = libde265filters
 AppName                   = libde265 Filters
 AppPublisher              = struktur AG
 AppPublisherURL           = https://github.com/strukturag/LAVFilters
-AppVerName                = libde265 Filters {#=LAV_VERSION_STRING}
-AppVersion                = {#=LAV_VERSION_STRING}
-VersionInfoVersion        = {#=LAV_VERSION_MAJOR}.{#=LAV_VERSION_MINOR}.{#=LAV_VERSION_REVISION}.{#=LAV_VERSION_BUILD}
+AppVerName                = libde265 Filters {#=LIBDE265_VERSION_STRING}
+AppVersion                = {#=LIBDE265_VERSION_STRING}
+VersionInfoVersion        = {#=LIBDE265_VERSION_MAJOR}.{#=LIBDE265_VERSION_MINOR}.{#=LIBDE265_VERSION_REVISION}.{#=LIBDE265_VERSION_BUILD}
 VersionInfoCompany        = struktur AG
 VersionInfoCopyright      = GPLv2
-OutputBaseFilename        = libde265-filters-{#=LAV_VERSION_STRING}
+OutputBaseFilename        = libde265-filters-{#=LIBDE265_VERSION_STRING}
 OutputDir                 = .
 Compression               = lzma2/ultra64
 SolidCompression          = yes
