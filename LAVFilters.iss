@@ -3,6 +3,7 @@
 ; Include version info
 #define ISPP_INCLUDED
 #include "common\includes\version.h"
+#include "common\includes\libde265-version.h"
 
 [Setup]
 AllowCancelDuringInstall  = no
@@ -12,12 +13,12 @@ AppId                     = libde265filters
 AppName                   = libde265 Filters
 AppPublisher              = struktur AG
 AppPublisherURL           = https://github.com/strukturag/LAVFilters
-AppVerName                = libde265 Filters {#=LAV_VERSION_MAJOR}.{#=LAV_VERSION_MINOR}.{#=LAV_VERSION_REVISION}
-AppVersion                = {#=LAV_VERSION_MAJOR}.{#=LAV_VERSION_MINOR}.{#=LAV_VERSION_REVISION}
-VersionInfoVersion        = {#=LAV_VERSION_MAJOR}.{#=LAV_VERSION_MINOR}.{#=LAV_VERSION_REVISION}.0
+AppVerName                = libde265 Filters {#=LIBDE265_FILTERS_VERSION_MAJOR}.{#=LIBDE265_FILTERS_VERSION_MINOR}.{#=LIBDE265_FILTERS_VERSION_REVISION}
+AppVersion                = {#=LIBDE265_FILTERS_VERSION_MAJOR}.{#=LIBDE265_FILTERS_VERSION_MINOR}.{#=LIBDE265_FILTERS_VERSION_REVISION}
+VersionInfoVersion        = {#=LIBDE265_FILTERS_VERSION_MAJOR}.{#=LIBDE265_FILTERS_VERSION_MINOR}.{#=LIBDE265_FILTERS_VERSION_REVISION}.0
 VersionInfoCompany        = struktur AG
 VersionInfoCopyright      = GPLv2
-OutputBaseFilename        = libde265-filters-{#=LAV_VERSION_MAJOR}.{#=LAV_VERSION_MINOR}.{#=LAV_VERSION_REVISION}
+OutputBaseFilename        = libde265-filters-{#=LIBDE265_FILTERS_VERSION_MAJOR}.{#=LIBDE265_FILTERS_VERSION_MINOR}.{#=LIBDE265_FILTERS_VERSION_REVISION}
 OutputDir                 = .
 Compression               = lzma2/ultra
 SolidCompression          = yes
