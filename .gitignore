@@ -8,3 +8,8 @@
 /ipch
 /bin_*
 /common/includes/version_rev.h
+
+/.vagrant
+/build_result
+/Vagrantfile
+*.iso

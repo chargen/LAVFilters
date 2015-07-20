@@ -1,0 +1,43 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+
+  config.vm.define "build" do |build|
+    build.vm.box = "opentable/win-8.1-core-amd64-nocm"
+
+    build.vm.provision "shell", path: "scripts/vagrant/000_setup_powershell.cmd"
+    build.vm.provision "shell", path: "scripts/vagrant/001_disable_services.cmd"
+    build.vm.provision "shell", path: "scripts/vagrant/010_install_visual_studio.cmd"
+    build.vm.provision "shell", path: "scripts/vagrant/011_install_mingw.cmd"
+    build.vm.provision "shell", path: "scripts/vagrant/012_install_inno_setup.cmd"
+    build.vm.provision "shell", path: "scripts/vagrant/020_copy_code.cmd"
+    build.vm.provision "shell", path: "scripts/vagrant/030_compile.cmd"
+    build.vm.provision "shell", path: "scripts/vagrant/040_package.cmd"
+  end
+
+  # Spinning up boxes on OSX is slow, wait up to 15 minutes.
+  config.vm.boot_timeout = 900
+
+  # Wait for winrm responses for up to 2 hours.
+  config.winrm.timeout = 120*60
+
+  config.vm.provider "virtualbox" do |vb|
+    # Display the VirtualBox GUI when booting the machine.
+    vb.gui = true
+
+    # I/O APIC must be enabled to support more than 1 cpu on 32bit systems.
+    # http://makandracards.com/jan0sch/24843-vagrant-virtualbox-32bit-systems-and-more-than-one-cpu
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+
+    # You can get the Visual Studio Community 2013 Update 4 ISO image from
+    # https://www.visualstudio.com/de-de/downloads/download-visual-studio-vs#DownloadFamilies_2
+    # http://download.microsoft.com/download/7/1/B/71BA74D8-B9A0-4E6C-9159-A8335D54437E/vs2013.4_ce_enu.iso
+    vb.customize ["storageattach", :id, "--storagectl", "IDE Controller", "--port", "1", "--device", "0", "--type", "dvddrive", "--medium", "__VISUAL_STUDIO_ISO__"]
+
+    # Use multiple cpus to speed up building.
+    vb.memory = 4096
+    vb.cpus = 4
+  end
+
+end
