@@ -11,5 +11,7 @@
 
 /.vagrant
 /build_result
+/codesign-certificate.spc
+/codesign-key.pvk
 /Vagrantfile
 *.iso
