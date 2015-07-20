@@ -95,6 +95,7 @@ Source: bin_x64\libde265.dll;          DestDir: {app}\x64; Flags: ignoreversion 
 
 Source: COPYING;                       DestDir: {app};     Flags: ignoreversion restartreplace uninsrestartdelete
 Source: README.txt;                    DestDir: {app};     Flags: ignoreversion restartreplace uninsrestartdelete
+Source: README-libde265.txt;           DestDir: {app};     Flags: ignoreversion restartreplace uninsrestartdelete
 Source: CHANGELOG.txt;                 DestDir: {app};     Flags: ignoreversion restartreplace uninsrestartdelete
 
 [Icons]
